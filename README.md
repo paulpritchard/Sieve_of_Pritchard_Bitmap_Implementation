@@ -30,13 +30,19 @@ an alternative SIMD approach (i.e. operating on short vectors).
 The intrinsic *__builtin_popcountll* is also for the final counting of set bits.
 
 Note that the code does not use explicit SIMD processing (though optimizing compilers may do so),
-or multiprocessing, extensive loop unrolling, or extensive precomputation.
+or multiprocessing, or extensive loop unrolling, or extensive precomputation.
 
 ### wheel_sieve_optimized.cpp
 
 This is a self-contained C++ program.
 It essentially implements the abstract algorithm,
 differing only in starting with wheel 3 (and therefore taking special action for N \< 30).
+
+Note that the (fully!) abstract algorithm (i.e. at the level of sets) does not specify how all the mutiples p\*f
+of the current prime p are to be removed.
+The code exploits this freedom by distinguishing between those multiples p\*f that occur as a factor f'=p\*f in another multiple p\*f',
+and those that do not.
+The former are stacked and removed later in decreasing order; the latter are safely removed immediately. 
 
 Provided *__builtin_ctzll* finds each successive set bit in O(1) time (which is the case on modern processors),
 the resulting program runs in O(N/log log N) time, and the implicit constant factor is very small.
