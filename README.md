@@ -38,6 +38,6 @@ This is a self-contained C++ program.
 It essentially implements the abstract algorithm,
 differing only in starting with wheel 3 (and therefore taking special action for N \< 30).
 
-Provided *__builtin_ctzll* finds each successive set bit in O(1) time (which is the case on mopdern processors),
+Provided *__builtin_ctzll* finds each successive set bit in O(1) time (which is the case on modern processors),
 the resulting program runs in O(N/log log N) time, and the implicit constant factor is very small.
 It should be competitive with optimized single-threaded non-segmented implementations of the classic sieve of Eratosthenes.
