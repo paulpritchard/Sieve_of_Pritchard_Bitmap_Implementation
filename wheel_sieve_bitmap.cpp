@@ -2,7 +2,7 @@
    arguments: N [-p]
       N: finds primes up to N
      -p: (optional) print the primes found
-   optimized single-threaded implementation using a bitset compressed with wheel 3
+   single-threaded implementation using a bitset compressed with wheel 3
    2 <= N <= 4000000000
    (like the classic Sieve of Eratosthenes, this algorithm is not suitable for very large N due to memory requirements) */
 
