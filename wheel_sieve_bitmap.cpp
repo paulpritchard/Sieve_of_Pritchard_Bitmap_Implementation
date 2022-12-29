@@ -2,7 +2,7 @@
    arguments: N [-p]
       N: finds primes up to N
      -p: (optional) print the primes found
-   single-threaded implementation using a bitset compressed with wheel 3
+   optimized single-threaded implementation using a bitset compressed with wheel 3
    2 <= N <= 4000000000
    (like the classic Sieve of Eratosthenes, this algorithm is not suitable for very large N due to memory requirements) */
 
@@ -65,84 +65,87 @@ void Extend (char* &bitmap, uint64_t &length, uint64_t n) {
     length = n;
 }
 
-#define doLeastSetBit(bitset,cOn30,cbit8) uint64_t t = bitset & -bitset;\
+// Can be done much faster with AVX-512. See:
+// https://lemire.me/blog/2022/05/10/faster-bitset-decoding-using-intel-avx-512/
+#define doLeastSetBit(bitset,cOn30,cbit8mask) uint64_t t = bitset & -bitset;\
     uint64_t r = __builtin_ctzll(bitset);\
     /*uint64_t c = base + pr240[r];*/\
     uint64_t cOn30 = baseon30 + pr240On30[r];\
-    uint64_t cbit8 = pr240bit8[r];\
+    uint8_t cbit8mask = pr240bit8mask[r];\
     bitset ^= t;
 
 void Delete (char* &bitmap, uint64_t p, uint64_t length) {
     // Deletes multiples of p in bitmap that are <= length
-    uint64_t /*pr240[64],*/pr240On30[64], pr240bit8[64];
-    for (uint32_t r=0; r < 64; r++) { uint64_t t = p*bit64toval240[r];/* pr240[r] = t;*/ pr240On30[r] = t/30; pr240bit8[r] = t%30*8/30; }
+    uint32_t /*pr240[64],*/pr240On30[64]; // < p*8
+    uint8_t pr240bit8mask[64];
+    for (uint32_t r=0; r < 64; r++) { uint64_t t = p*bit64toval240[r];/* pr240[r] = t;*/ pr240On30[r] = t/30; pr240bit8mask[r] = ~(0x1 << t%30*8/30); }
     uint64_t *bitmap64 = (uint64_t *)bitmap;
-    uint64_t lengthOnp = length/p; if (lengthOnp % 2 == 0) lengthOnp -= 1;
+    uint64_t maxf = length/p; if (maxf % 2 == 0) maxf -= 1;
     /*uint64_t p240 = p*240;*/
-    uint64_t kmin = p/240, kmax = lengthOnp/240;
-    uint64_t bit64 = lengthOnp%240/30*8 + mod30_to_bit8[lengthOnp%240%30];
+    uint64_t kmin = p/240, kmax = maxf/240;
+    uint64_t bit64 = maxf%240/30*8 + mod30_to_bit8[maxf%240%30];
     uint64_t baseon30 = kmin*p*8/*, base = kmin*p240*/;
     uint64_t lengthto1on3 = cbrt(length);
     if (p > lengthto1on3) { // no need to stack composites c
         for (uint64_t k=kmin; k < kmax; k++) {
             uint64_t bitset = bitmap64[k];
             while (bitset != 0) {
-                doLeastSetBit(bitset,cOn30,cbit8);
-                bitmap[cOn30] &= ~(0x1 << cbit8); // unmark(c,bitmap)
+                doLeastSetBit(bitset,cOn30,cbit8mask);
+                bitmap[cOn30] &= cbit8mask; // unmark(c,bitmap)
             }
             baseon30 += p*8;/* base += p240;*/
         }
         uint64_t bitset = bitmap64[kmax] & (0xFFFFFFFFFFFFFFFF >> (63-bit64));
         while (bitset != 0) {
-            doLeastSetBit(bitset,cOn30,cbit8);
-            bitmap[cOn30] &= ~(0x1 << cbit8); // unmark(c,bitmap)
+            doLeastSetBit(bitset,cOn30,cbit8mask);
+            bitmap[cOn30] &= cbit8mask; // unmark(c,bitmap)
         }
         unmark(p,bitmap);
         return;
     }
     // p <= lengthto1on3, so both types of factors
-    uint64_t lengthOnp2 = lengthOnp/p; if (lengthOnp2 % 2 == 0) lengthOnp2 -= 1;
-    uint64_t kmid = lengthOnp2/240;
-    uint64_t bit64mid = lengthOnp2%240/30*8 + mod30_to_bit8[lengthOnp2%240%30];
-    // stack composites c <= lengthOnp2
-    uint64_t* cstack = new uint64_t[((lengthOnp-1)/30+1)*8]; uint64_t ics = 0;
+    uint64_t maxfOnp = maxf/p; if (maxfOnp % 2 == 0) maxfOnp -= 1;
+    uint64_t kmid = maxfOnp/240;
+    uint64_t bit64mid = maxfOnp%240/30*8 + mod30_to_bit8[maxfOnp%240%30];
+    // stack composites c <= maxfOnp
+    uint64_t* cstack = new uint64_t[((maxf-1)/30+1)*8]; uint64_t ics = 0;
     for (uint64_t k=kmin; k < kmid; k++) {
         uint64_t bitset = bitmap64[k];
         while (bitset != 0) {
-            doLeastSetBit(bitset,cOn30,cbit8);
-            cstack[ics++] = (cOn30 << 3) | cbit8; // packed
+            doLeastSetBit(bitset,cOn30,cbit8mask);
+            cstack[ics++] = (cOn30 << 8) | cbit8mask; // packed
         }
         baseon30 += p*8;/* base += p240;*/
     }
     uint64_t bitset = bitmap64[kmid] & (0xFFFFFFFFFFFFFFFF >> (63-bit64mid));
     while (bitset != 0) {
-        doLeastSetBit(bitset,cOn30,cbit8);
-        cstack[ics++] = (cOn30 << 3) | cbit8; // packed
+        doLeastSetBit(bitset,cOn30,cbit8mask);
+        cstack[ics++] = (cOn30 << 8) | cbit8mask; // packed
     }
-    // process composites c > lengthOnp2
+    // process composites c > maxfOnp
     bitset = (bit64mid == 63 ? 0 : bitmap64[kmid] & (0xFFFFFFFFFFFFFFFF << bit64mid+1));
     if (kmax > kmid) {
         while (bitset != 0) {
-            doLeastSetBit(bitset,cOn30,cbit8);
-            bitmap[cOn30] &= ~(0x1 << cbit8); // unmark(c,bitmap)  
+            doLeastSetBit(bitset,cOn30,cbit8mask);
+            bitmap[cOn30] &= cbit8mask; // unmark(c,bitmap)  
         }
         baseon30 += p*8;/* base += p240;*/
         for (uint64_t k=kmid+1; k < kmax; k++) {
             uint64_t bitset = bitmap64[k];
             while (bitset != 0) {
-                doLeastSetBit(bitset,cOn30,cbit8);
-                bitmap[cOn30] &= ~(0x1 << cbit8); // unmark(c,bitmap)  
+                doLeastSetBit(bitset,cOn30,cbit8mask);
+                bitmap[cOn30] &= cbit8mask; // unmark(c,bitmap)  
             }
             baseon30 += p*8;/* base += p240;*/
         }
         bitset = bitmap64[kmax] & (0xFFFFFFFFFFFFFFFF >> (63-bit64));
     } else bitset &= (bitmap64[kmid] & (0xFFFFFFFFFFFFFFFF >> (63-bit64)));
     while (bitset != 0) {
-        doLeastSetBit(bitset,cOn30,cbit8);
-        bitmap[cOn30] &= ~(0x1 << cbit8); // unmark(c,bitmap)  
+        doLeastSetBit(bitset,cOn30,cbit8mask);
+        bitmap[cOn30] &= cbit8mask; // unmark(c,bitmap)  
     }
-    // process c <= lengthOnp2 in reverse order
-    while (ics > 0) { uint64_t t = cstack[--ics]; bitmap[t >> 3] &= ~(1 << (t & 0x7)); }
+    // process c <= maxfOnp in reverse order
+    while (ics > 0) { uint64_t t = cstack[--ics]; bitmap[t >> 8] &= (t & 0xFF); }
     delete[] cstack;
     unmark(p,bitmap);
 }
