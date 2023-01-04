@@ -13,6 +13,7 @@
 #include <ctime>
 #include <math.h>
 #include <inttypes.h>
+#include <x86intrin.h>
 
 // constants for wheel 3 compression
 const int mod30_to_bit8[] = {-1,0,0,0,0,0,0,1,1,1,1,2,2,3,3,3,3,4,4,5,5,5,5,6,6,6,6,6,6,7};
@@ -30,11 +31,10 @@ uint64_t print(uint64_t *bitmap, uint64_t bitmapsize) {
     for (uint64_t k = 0; k < bitmapsize; ++k) {
         uint64_t bitset = bitmap[k];
         while (bitset != 0) {
-            uint64_t t = bitset & -bitset;
             uint64_t r = __builtin_ctzll(bitset);
             uint64_t x = base + bit64toval240[r];
             printf("%lu\n", x); pos++;
-            bitset ^= t;
+            bitset = _blsr_u64(bitset);
         }
         base += 240;
     }
@@ -65,12 +65,12 @@ void Extend (char* &bitmap, uint64_t &length, uint64_t n) {
 
 // Can be done much faster with AVX-512. See:
 // https://lemire.me/blog/2022/05/10/faster-bitset-decoding-using-intel-avx-512/
-#define doLeastSetBit(bitset,cOn30,cbit8mask) uint64_t t = bitset & -bitset;\
+#define doLeastSetBit(bitset,cOn30,cbit8mask)\
     uint64_t r = __builtin_ctzll(bitset);\
     /*uint64_t c = base + pr240[r];*/\
     uint64_t cOn30 = baseon30 + pr240On30[r];\
     uint8_t cbit8mask = pr240bit8mask[r];\
-    bitset ^= t;
+    bitset = _blsr_u64(bitset);
 
 void Delete (char* &bitmap, uint64_t p, uint64_t length) {
     // Deletes multiples of p in bitmap that are <= length
