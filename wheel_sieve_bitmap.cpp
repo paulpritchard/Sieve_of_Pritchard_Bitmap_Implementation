@@ -10,11 +10,9 @@
 
 #include <cstring>
 #include <stdio.h>
-#include <stdint.h>
 #include <ctime>
 #include <math.h>
 #include <inttypes.h>
-#include <x86intrin.h>
 
 // constants for wheel 3 compression
 const int mod30_to_bit8[] = {-1,0,0,0,0,0,0,1,1,1,1,2,2,3,3,3,3,4,4,5,5,5,5,6,6,6,6,6,6,7};
@@ -78,7 +76,9 @@ void Delete (char* &bitmap, uint64_t p, uint64_t length) {
     // Deletes multiples of p in bitmap that are <= length
     uint32_t /*pr240[64],*/pr240On30[64]; // < p*8
     uint8_t pr240bit8mask[64];
-    for (uint32_t r=0; r < 64; r++) { uint64_t t = p*bit64toval240[r];/* pr240[r] = t;*/ pr240On30[r] = t/30; pr240bit8mask[r] = ~(0x1 << t%30*8/30); }
+    for (uint32_t r=0; r < 64; r++) {
+        uint64_t t = p*bit64toval240[r];/* pr240[r] = t;*/ pr240On30[r] = t/30; pr240bit8mask[r] = ~(0x1 << t%30*8/30);
+    }
     uint64_t *bitmap64 = (uint64_t *)bitmap;
     uint64_t maxf = length/p; if (maxf % 2 == 0) maxf -= 1;
     /*uint64_t p240 = p*240;*/
@@ -194,7 +194,6 @@ int main (int argc, char *argw[]) {
     if (error) { printf("call with: %s N -p where 2 <= N <= %lu and -p to print the primes is optional \n", argw[0], max); exit(1); }
     int start_s = clock();
     piN = Sift(N, printPrimes);
-    int stop_s=clock();
-    float duration = (stop_s-start_s)*1E3/double(CLOCKS_PER_SEC);
+    float duration = (clock()-start_s)*1E3/double(CLOCKS_PER_SEC);
     printf("%lu primes up to %lu found in %.2f ms\n", piN, N, duration);
 }
