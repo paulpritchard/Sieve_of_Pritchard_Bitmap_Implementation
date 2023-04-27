@@ -3,7 +3,7 @@
       N: finds primes up to N
      -p: (optional) print the primes found
    optimized single-threaded implementation using a bitset compressed with wheel 3
-   2 <= N <= 4000000000
+   2 <= N <= 100000000000
    (like the classic Sieve of Eratosthenes, this algorithm is not suitable for very large N due to memory requirements) */
 
 // g++ -O3 -o wheel_sieve_bitmap wheel_sieve_bitmap.cpp -march=native -lm
@@ -154,6 +154,7 @@ uint64_t Sift(uint64_t N, bool printPrimes) {
     // counts the primes up to N, printing them if printPrimes
     uint64_t bitmapsize = ((N/30+1 - 1)/8+1)*8; // round to 8 bytes
     char *bitmap = (char*)calloc(bitmapsize, 1);
+    if (bitmap == NULL) { printf("unable to allocate bitmap\n"); exit(1); }
     /* representation invariant (for the main loop): bitmap of size bitmapsize is the ordered set W compressed with W_3 */
     uint64_t k = 1; if (printPrimes) printf("%u\n", 2);
     if (N >= 3) { k++; printPrimes && printf("%u\n", 3); }
